@@ -1,0 +1,70 @@
+# Release: manual, honest typecheck+sanity gate that tags and publishes a
+# GitHub Release. OS packaging (electron bundles, symbols, native modules)
+# intentionally does not run in CI — it requires the native C++ toolchain and
+# is driven from a maintainer machine via the repo's build/ scripts.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version WITHOUT the leading v (e.g. 1.0.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify, tag and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable corepack (pnpm pinned in package.json)
+        run: corepack enable
+
+      - name: Validate version input (strict x.y.z)
+        run: |-
+          node -e "if(!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(process.env.RELEASE_VERSION)){console.error('version must match x.y.z, got:', process.env.RELEASE_VERSION); process.exit(1)}"
+
+      - name: Configure git identity
+        run: |-
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # Native C++ builds are NOT part of CI (see header comment); install is
+      # still needed so the typecheck can resolve dependencies.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck client
+        run: pnpm run typecheck-client
+
+      - name: Repo config sanity (strict)
+        run: node scripts/upstream/repo-sanity.mjs --strict
+
+      - name: Create tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |-
+          printf '## frappe-studio v%s\n\nAutomated release from commit %s. Full OS packaging (native toolchain) is run on maintainer machines using the repo build/ scripts; this release only guarantees typecheck + repo-sanity gates passed.\n' "$RELEASE_VERSION" "$(git rev-parse HEAD)" > release-notes.md
+          gh release create "v${RELEASE_VERSION}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "frappe-studio v${RELEASE_VERSION}" \
+            --notes-file release-notes.md \
+            --target "$GITHUB_SHA"

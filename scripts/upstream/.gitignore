@@ -1,0 +1,4 @@
+# Generated state — do not track
+/.status.json
+/report/
+/.selftest-config.tmp.json

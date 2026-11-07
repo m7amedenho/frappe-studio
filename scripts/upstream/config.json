@@ -1,0 +1,20 @@
+{
+  "upstreamRemote": "upstream",
+  "upstreamRef": "main",
+  "forkRemote": "origin",
+  "mainBranch": "main",
+  "upstreamBaseCommit": "1745a4a6102e93173430b4b2debc1247a91cd036",
+  "upstreamBaseTagRef": "refs/frappe-studio/upstream-base",
+  "syncBranchPrefix": "upstream-sync",
+  "protectedPaths": [
+    "src/vs/workbench/contrib/frappeStudio",
+    "docs/upstream",
+    "scripts/upstream",
+    ".github/workflows"
+  ],
+  "mechanicallyResolvableConflictKinds": [
+    "whitespace",
+    "import-order"
+  ],
+  "maxCommitsBehindBeforeWarning": 500
+}

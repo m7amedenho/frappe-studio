@@ -1,0 +1,85 @@
+# Upstream Sync: run the sync workflow and push the sync branch for review.
+#
+# GATE: the pushed branch is NEVER merged into main automatically — a PR review
+# is required. On conflicts, the merge is aborted and the conflict report is
+# uploaded; the sync branch stays unpushed.
+name: Upstream Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 07:00 UTC, right after upstream-check.yml (06:00 UTC).
+    # The job-level `if` documents the gate: scheduled runs only fire when
+    # workflow-level gating passed; manual dispatch can always force a re-run.
+    - cron: '0 7 * * 1'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Run upstream sync (branch-only, PR-gated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: github.event_name == 'workflow_dispatch' || success()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable corepack (pnpm pinned in package.json)
+        run: corepack enable
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/microsoft/vscode.git
+
+      - name: Configure git identity
+        run: |-
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run upstream sync
+        id: sync
+        continue-on-error: true
+        run: node scripts/upstream/upstream.mjs sync
+
+      # Success: push ONLY the new sync branch (never main, never --force).
+      - name: Push sync branch (opens PR flow, never merges to main)
+        if: steps.sync.outcome == 'success'
+        run: |-
+          git push origin HEAD
+          git push origin refs/frappe-studio/upstream-base
+          echo "::notice::Upstream sync branch pushed. Open a PR from the upstream-sync-* branch into main. Nothing was pushed to upstream and nothing was merged into main."
+
+      # Failure (typically conflicts): upload the conflict report and fail loudly.
+      - name: Locate conflict report
+        if: steps.sync.outcome == 'failure'
+        id: conflict
+        run: |-
+          f=$(ls -t scripts/upstream/report/*-conflicts.md 2>/dev/null | head -n 1 || true)
+          echo "report_path=$f" >> "$GITHUB_OUTPUT"
+
+      - name: Upload conflict report
+        if: steps.sync.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-conflicts
+          path: scripts/upstream/report/
+          if-no-files-found: warn
+
+      - name: Fail with conflict report path
+        if: steps.sync.outcome == 'failure'
+        run: |-
+          echo "::error::Upstream sync failed (see the sync log). Conflict report: ${{ steps.conflict.outputs.report_path }} (fallback: scripts/upstream/report/). The sync branch was left unpushed for inspection; resolve conflicts per scripts/upstream/README.md and push it manually."
+          exit 1

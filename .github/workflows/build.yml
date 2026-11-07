@@ -1,0 +1,45 @@
+# Build: typecheck the fork's TypeScript.
+# Kept intentionally light: native C++ builds and packaging are NOT done here —
+# packaging requires the native toolchain and runs in a separate pipeline
+# (see release.yml comments and .github/workflows/release.yml).
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Typecheck client
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: false
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable corepack (pnpm pinned in package.json)
+        run: corepack enable
+
+      # Native/C++ builds (node-gyp and friends) are intentionally skipped:
+      # they need the C++ toolchain and belong to a separate packaging pipeline.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck client
+        run: pnpm run typecheck-client

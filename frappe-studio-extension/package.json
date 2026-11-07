@@ -1,0 +1,49 @@
+{
+  "name": "frappe-studio",
+  "displayName": "Frappe Studio",
+  "description": "Frappe development tools inside Visual Studio Code",
+  "version": "0.1.0",
+  "publisher": "m7amedenho",
+  "repository": { "type": "git", "url": "https://github.com/m7amedenho/frappe-studio" },
+  "license": "MIT",
+  "pricing": "Free",
+  "packageManager": "pnpm@12.16.0",
+  "engines": { "vscode": "^1.96.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onView:frappeStudio.sites"],
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "frappeStudio", "title": "Frappe Studio", "icon": "resources/icon.svg" }] },
+    "views": { "frappeStudio": [{ "id": "frappeStudio.sites", "name": "Sites and Documents" }] },
+    "commands": [
+      { "command": "frappeStudio.connect", "title": "Frappe Studio: Connect to Site" },
+      { "command": "frappeStudio.disconnect", "title": "Frappe Studio: Disconnect" },
+      { "command": "frappeStudio.refresh", "title": "Frappe Studio: Refresh" },
+      { "command": "frappeStudio.open", "title": "Frappe Studio: Open Document" },
+      { "command": "frappeStudio.createDocType", "title": "Frappe Studio: Create DocType" },
+      { "command": "frappeStudio.createDocument", "title": "Frappe Studio: Create Workflow, Report, or Print Format" },
+      { "command": "frappeStudio.apiRequest", "title": "Frappe Studio: API Request" },
+      { "command": "frappeStudio.openDesk", "title": "Frappe Studio: Open Desk" },
+      { "command": "frappeStudio.bench", "title": "Frappe Studio: Run Bench Command" }
+    ],
+    "menus": { "view/title": [
+      { "command": "frappeStudio.connect", "when": "view == frappeStudio.sites", "group": "navigation" },
+      { "command": "frappeStudio.refresh", "when": "view == frappeStudio.sites", "group": "navigation" }
+    ] },
+    "configuration": { "title": "Frappe Studio", "properties": {
+      "frappeStudio.benchDirectory": { "type": "string", "default": "", "description": "Local Bench root directory used for Bench commands." }
+    } }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "check": "tsc -p . --noEmit",
+    "test": "node --test test/*.test.cjs",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,64 @@
+# Upstream Check: weekly gate for drift from microsoft/vscode.
+# Only REPORTS drift (artifact + notice). Never merges anything into main.
+name: Upstream Check
+
+on:
+  schedule:
+    # Mondays 06:00 UTC, an hour before upstream-sync.yml (07:00 UTC)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check upstream drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/microsoft/vscode.git
+
+      - name: Check upstream drift
+        id: check
+        # Drift is the EXPECTED outcome eventually; let the workflow continue so
+        # status/report/artifact still run. The notice below reports the drift.
+        continue-on-error: true
+        run: node scripts/upstream/upstream.mjs check
+
+      - name: Status dashboard
+        if: always()
+        run: node scripts/upstream/upstream.mjs status
+
+      - name: Write upstream report
+        if: always()
+        id: report
+        run: |-
+          out=$(node scripts/upstream/upstream.mjs report)
+          echo "report_path=$out" >> "$GITHUB_OUTPUT"
+          echo "$out"
+
+      - name: Notice on drift
+        if: steps.check.outcome == 'failure'
+        run: |-
+          echo "::notice::Upstream microsoft/vscode has advanced beyond the recorded base in scripts/upstream/config.json. See the log, scripts/upstream/.status.json and the report-* artifact. Run upstream-sync.yml (or a maintainer runs 'node scripts/upstream/upstream.mjs sync'); nothing auto-merges into main."
+
+      - name: Upload upstream report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-report
+          path: scripts/upstream/report/
+          if-no-files-found: warn

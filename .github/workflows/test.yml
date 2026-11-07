@@ -1,0 +1,43 @@
+# Tests: fast, dependency-free checks only.
+# The repo's unit tests compile the whole src tree via gulp, which is heavy for CI;
+# until the frappeStudio contribution grows its own compiled test suite, gate on:
+#   * scripts/upstream/selftest.mjs        (pure unit tests for the upstream tooling)
+#   * scripts/upstream/repo-sanity.mjs     (repo config + integration-seam sanity)
+#
+# NOTE: --strict makes the frappeStudio import seam in
+# src/vs/workbench/workbench.common.main.ts fatal. Until the fork integration is
+# registered there, swap to strict once the import line lands.
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Upstream tooling self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Upstream tooling self-tests
+        run: node scripts/upstream/selftest.mjs
+
+      - name: Repo config sanity
+        run: node scripts/upstream/repo-sanity.mjs --strict
